@@ -24,3 +24,17 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Hide Next.js dev toolbar/indicator button */
+#nextjs__container,
+#__nextBuildIndicator,
+#__next-dev-overlay,
+#__next-build-watcher,
+[data-nextjs-dev-overlay],
+[data-nextjs-build-overlay],
+button[aria-label="Next.js"],
+button[title="Next.js"],
+a[aria-label="Next.js"],
+a[title="Next.js"] {
+  display: none !important;
+}
