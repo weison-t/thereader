@@ -122,50 +122,68 @@ export default function ReportsDashboardPage() {
 
       {data?.exists && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
-            <div className="mb-2 text-xs font-medium">By Department</div>
-            {renderBar(data.department)}
-          </div>
+          {data.department?.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="mb-2 text-xs font-medium">By Department</div>
+              {renderBar(data.department)}
+            </div>
+          )}
 
-          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
-            <div className="mb-2 text-xs font-medium">By Agent</div>
-            {renderBar(data.agent)}
-          </div>
+          {data.agent?.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="mb-2 text-xs font-medium">By Agent</div>
+              {renderBar(data.agent)}
+            </div>
+          )}
 
-          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
-            <div className="mb-2 text-xs font-medium">By Actual Agent</div>
-            {renderBar(data.actual_agent)}
-          </div>
+          {data.actual_agent?.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="mb-2 text-xs font-medium">By Actual Agent</div>
+              {renderBar(data.actual_agent)}
+            </div>
+          )}
 
-          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
-            <div className="mb-2 text-xs font-medium">By Market</div>
-            {renderPie(data.market)}
-          </div>
+          {data.market?.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="mb-2 text-xs font-medium">By Market</div>
+              {renderPie(data.market)}
+            </div>
+          )}
 
-          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
-            <div className="mb-2 text-xs font-medium">By VIP Status</div>
-            {renderPie(data.vip_status)}
-          </div>
+          {data.vip_status?.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="mb-2 text-xs font-medium">By VIP Status</div>
+              {renderPie(data.vip_status)}
+            </div>
+          )}
 
-          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
-            <div className="mb-2 text-xs font-medium">By Rating</div>
-            {renderBar(data.rating)}
-          </div>
+          {data.rating?.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="mb-2 text-xs font-medium">By Rating</div>
+              {renderBar(data.rating)}
+            </div>
+          )}
 
-          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
-            <div className="mb-2 text-xs font-medium">By Category</div>
-            {renderBar(data.category)}
-          </div>
+          {data.category?.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="mb-2 text-xs font-medium">By Category</div>
+              {renderBar(data.category)}
+            </div>
+          )}
 
-          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
-            <div className="mb-2 text-xs font-medium">By Duration (mins)</div>
-            {renderBar(data.duration_buckets as unknown as SeriesItem[], "bucket")}
-          </div>
+          {data.duration_buckets?.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+              <div className="mb-2 text-xs font-medium">By Duration (mins)</div>
+              {renderBar(data.duration_buckets as unknown as SeriesItem[], "bucket")}
+            </div>
+          )}
 
-          <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950 md:col-span-2">
-            <div className="mb-2 text-xs font-medium">By Country / Region</div>
-            {renderBar(data.country_region)}
-          </div>
+          {data.country_region?.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950 md:col-span-2">
+              <div className="mb-2 text-xs font-medium">By Country / Region</div>
+              {renderBar(data.country_region)}
+            </div>
+          )}
         </div>
       )}
     </section>

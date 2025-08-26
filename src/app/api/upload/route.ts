@@ -44,7 +44,7 @@ const SNAPSHOT_DISPLAY_TO_NORMALIZED: Record<string, string> = {
   "Country/Region": "country_region",
 };
 
-async function rebuildProcessedData() {
+async function rebuildDataSnapshot() {
   const pool = await getDb();
   const client = await pool.connect();
   try {
@@ -55,11 +55,11 @@ async function rebuildProcessedData() {
       // ignore
     }
 
-    // If raw_chat does not exist, just drop processed_data and return
+    // If raw_chat does not exist, just drop data_snapshot and return
     const rcExistsQ = await client.query("select to_regclass('public.raw_chat') is not null as exists");
     const rcExists = Boolean(rcExistsQ.rows?.[0]?.exists);
     if (!rcExists) {
-      await client.query("drop table if exists public.processed_data");
+      await client.query("drop table if exists public.data_snapshot");
       return;
     }
 
@@ -142,10 +142,10 @@ async function rebuildProcessedData() {
     selectParts.push(vipExpr);
     const selectList = selectParts.join(",");
 
-    // Rebuild processed_data
-    await client.query("drop table if exists public.processed_data");
+    // Rebuild data_snapshot
+    await client.query("drop table if exists public.data_snapshot");
     await client.query(
-      `create table public.processed_data as select ${selectList} from public.raw_chat rc${joinClause}`
+      `create table public.data_snapshot as select ${selectList} from public.raw_chat rc${joinClause}`
     );
   } finally {
     client.release();
@@ -252,9 +252,9 @@ export async function POST(req: NextRequest) {
       client.release();
     }
 
-    // Rebuild processed_data snapshot when raw_chat or agent_info change
+    // Rebuild data_snapshot when raw_chat or agent_info change
     if (type === "raw_chat" || type === "agent_info") {
-      await rebuildProcessedData();
+      await rebuildDataSnapshot();
     }
 
     return Response.json({ ok: true, table: tableName, object: objectName });
@@ -355,9 +355,9 @@ export async function DELETE(req: NextRequest) {
     // Drop source table
     await getDb().query(`drop table if exists public.${cfg.table}`);
 
-    // If removing a source for snapshot, drop processed_data as requested
+    // If removing a source for snapshot, drop data_snapshot as requested
     if (type === "raw_chat" || type === "agent_info") {
-      await getDb().query("drop table if exists public.processed_data");
+      await getDb().query("drop table if exists public.data_snapshot");
     }
 
     return Response.json({ ok: true });
