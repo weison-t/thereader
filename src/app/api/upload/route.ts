@@ -154,32 +154,70 @@ async function rebuildDataSnapshot() {
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const type = formData.get("type");
-    const file = formData.get("file") as File | null;
+    const ct = req.headers.get("content-type") || "";
+    let type: any;
+    let records: string[][] = [];
+    let header: string[] = [];
+    let objectPath: string | null = null;
+    let arrayBuffer: ArrayBuffer | null = null;
 
-    if (type !== "raw_chat" && type !== "agent_info" && type !== "criteria_scoring") {
-      return Response.json({ error: "Invalid type" }, { status: 400 });
+    if (ct.includes("application/json")) {
+      const body = await req.json();
+      type = body?.type;
+      objectPath = String(body?.objectPath || "");
+      if (type !== "raw_chat" && type !== "agent_info" && type !== "criteria_scoring") {
+        return Response.json({ error: "Invalid type" }, { status: 400 });
+      }
+      if (!objectPath) {
+        return Response.json({ error: "Missing objectPath" }, { status: 400 });
+      }
+      const cfg = CONFIG[type as UploadType];
+      const supabase = createSupabaseAdmin();
+      const dl = await supabase.storage.from(cfg.bucket).download(objectPath);
+      if (dl.error || !dl.data) {
+        return Response.json({ error: dl.error?.message || "Download failed" }, { status: 400 });
+      }
+      arrayBuffer = await dl.data.arrayBuffer();
+      const text = new TextDecoder("utf-8").decode(arrayBuffer);
+      const parsed = Papa.parse<string[]>(text, { skipEmptyLines: true });
+      if (parsed.errors?.length) {
+        return Response.json({ error: parsed.errors[0].message }, { status: 400 });
+      }
+      const rows = parsed.data as string[][];
+      if (!rows.length) {
+        return Response.json({ error: "No rows found" }, { status: 400 });
+      }
+      [header, ...records] = rows;
+      // After successful download, purge older objects to keep only latest
+      try {
+        const list = await supabase.storage.from(cfg.bucket).list(cfg.storagePrefix, { limit: 100 });
+        const others = (list.data || [])
+          .map((x) => `${cfg.storagePrefix}/${x.name}`)
+          .filter((p) => p !== objectPath);
+        if (others.length) await supabase.storage.from(cfg.bucket).remove(others);
+      } catch (_) {}
+    } else {
+      const formData = await req.formData();
+      type = formData.get("type");
+      const file = formData.get("file") as File | null;
+      if (type !== "raw_chat" && type !== "agent_info" && type !== "criteria_scoring") {
+        return Response.json({ error: "Invalid type" }, { status: 400 });
+      }
+      if (!file) {
+        return Response.json({ error: "Missing file" }, { status: 400 });
+      }
+      arrayBuffer = await file.arrayBuffer();
+      const text = Buffer.from(arrayBuffer).toString("utf8");
+      const parsed = Papa.parse<string[]>(text, { skipEmptyLines: true });
+      if (parsed.errors?.length) {
+        return Response.json({ error: parsed.errors[0].message }, { status: 400 });
+      }
+      const rows = parsed.data as string[][];
+      if (!rows.length) {
+        return Response.json({ error: "No rows found" }, { status: 400 });
+      }
+      [header, ...records] = rows;
     }
-    if (!file) {
-      return Response.json({ error: "Missing file" }, { status: 400 });
-    }
-
-    // Read file into text for CSV parse
-    const arrayBuffer = await file.arrayBuffer();
-    const text = Buffer.from(arrayBuffer).toString("utf8");
-
-    // Parse CSV
-    const parsed = Papa.parse<string[]>(text, { skipEmptyLines: true });
-    if (parsed.errors?.length) {
-      return Response.json({ error: parsed.errors[0].message }, { status: 400 });
-    }
-    const rows = parsed.data as string[][];
-    if (!rows.length) {
-      return Response.json({ error: "No rows found" }, { status: 400 });
-    }
-
-    const [header, ...records] = rows;
     // Normalize headers and ensure uniqueness to avoid duplicate column errors
     const baseNames = header.map((h, idx) => {
       const raw = (h || "").toString().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
@@ -204,21 +242,24 @@ export async function POST(req: NextRequest) {
       return candidate;
     });
 
-    const cfg = CONFIG[type];
+    const cfg = CONFIG[type as UploadType];
     const supabase = createSupabaseAdmin();
     await ensureBucket(cfg.bucket);
 
     // Replace storage object (keep only one latest)
-    const list = await supabase.storage.from(cfg.bucket).list(cfg.storagePrefix, { limit: 100 });
-    if (list.data?.length) {
-      const paths = list.data.map((x) => `${cfg.storagePrefix}/${x.name}`);
-      await supabase.storage.from(cfg.bucket).remove(paths);
+    let objectName = objectPath;
+    if (!objectName) {
+      const list = await supabase.storage.from(cfg.bucket).list(cfg.storagePrefix, { limit: 100 });
+      if (list.data?.length) {
+        const paths = list.data.map((x) => `${cfg.storagePrefix}/${x.name}`);
+        await supabase.storage.from(cfg.bucket).remove(paths);
+      }
+      objectName = `${cfg.storagePrefix}/${Date.now()}_upload.csv`;
+      await supabase.storage.from(cfg.bucket).upload(objectName, arrayBuffer!, {
+        contentType: "text/csv",
+        upsert: true,
+      });
     }
-    const objectName = `${cfg.storagePrefix}/${Date.now()}_${file.name}`;
-    await supabase.storage.from(cfg.bucket).upload(objectName, arrayBuffer, {
-      contentType: file.type || "text/csv",
-      upsert: true,
-    });
 
     // Create/replace source table and insert rows using direct Postgres connection
     const tableName = cfg.table;

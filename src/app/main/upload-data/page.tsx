@@ -35,12 +35,31 @@ export default function UploadDataPage() {
     setIsUploading(true);
     setMessage("");
     try {
-      const form = new FormData();
-      form.set("type", type);
-      form.set("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: form });
+      // Step 1: request signed upload URL
+      const pres = await fetch("/api/upload/presign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, filename: file.name })
+      });
+      const presData = await pres.json();
+      if (!pres.ok) throw new Error(presData?.error || "Presign failed");
+
+      // Step 2: upload directly to Supabase Storage
+      const uploadRes = await fetch(presData.token, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "text/csv" },
+        body: file,
+      });
+      if (!uploadRes.ok) throw new Error("Storage upload failed");
+
+      // Step 3: tell server to process the stored object
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, objectPath: presData.path })
+      });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Upload failed");
+      if (!res.ok) throw new Error(data?.error || "Process failed");
       setMessage(`Uploaded and loaded into table: ${data.table}`);
       await fetchCurrent();
       await fetchPreview(type);
