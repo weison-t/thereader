@@ -75,66 +75,37 @@ export async function POST(req: NextRequest) {
       }
       await createIfNotExists();
 
-      // Pull rows from response_result
-      const rr = await runQuery(`select * from public.response_result order by created_at asc`);
-      const rows = rr.rows as any[];
-      let inserted = 0;
-      for (const r of rows) {
-        const qaName = (r.qa_name && String(r.qa_name).trim()) ? String(r.qa_name).trim() : "AIVA";
-        const payload = {
-          qa_name: qaName,
-          agent_caller_name: r.agent_caller_name ?? null,
-          opening_response_time: toNumberFromScoreCell(r.opening_response_time),
-          ongoing_response_time: toNumberFromScoreCell(r.ongoing_response_time),
-          holding_management: toNumberFromScoreCell(r.holding_management),
-          closing_management: toNumberFromScoreCell(r.closing_management),
-          verification_efficiency: toNumberFromScoreCell(r.verification_efficiency),
-          thoroughness: toNumberFromScoreCell(r.thoroughness),
-          proactiveness: toNumberFromScoreCell(r.proactiveness),
-          relevance_and_clarity: toNumberFromScoreCell(r.relevance_and_clarity),
-          language_natural_flow: toNumberFromScoreCell(r.language_natural_flow),
-          correction: toNumberFromScoreCell(r.correction),
-          proper_empathy_acknowledgement: toNumberFromScoreCell(r.proper_empathy_acknowledgement),
-          breach_confidentiality: String(r.breach_confidentiality_auto_failed || '').toLowerCase() === 'true',
-          rudeness_unprofessionalism: String(r.rudeness_unprofessionalism_auto_failed || '').toLowerCase() === 'true',
-          overall_chat_handling_customer_experience: toNumberFromScoreCell(r.overall_chat_handling_customer_experience),
-          scoring: r.final_score ?? null,
-          results: r.quality_assurance_feedback ?? null,
-          agent_status: null,
-        } as const;
-
-        await runQuery(
-          `insert into public.scoring_data (
-            qa_name, agent_caller_name,
-            opening_response_time, ongoing_response_time, holding_management, closing_management,
-            verification_efficiency, thoroughness, proactiveness, relevance_and_clarity, language_natural_flow,
-            correction, proper_empathy_acknowledgement,
-            breach_confidentiality, rudeness_unprofessionalism,
-            overall_chat_handling_customer_experience,
-            scoring, results, agent_status
-          ) values (
-            $1,$2,
-            $3,$4,$5,$6,
-            $7,$8,$9,$10,$11,
-            $12,$13,
-            $14,$15,
-            $16,
-            $17,$18,$19
-          )`,
-          [
-            payload.qa_name, payload.agent_caller_name,
-            payload.opening_response_time, payload.ongoing_response_time, payload.holding_management, payload.closing_management,
-            payload.verification_efficiency, payload.thoroughness, payload.proactiveness, payload.relevance_and_clarity, payload.language_natural_flow,
-            payload.correction, payload.proper_empathy_acknowledgement,
-            payload.breach_confidentiality, payload.rudeness_unprofessionalism,
-            payload.overall_chat_handling_customer_experience,
-            payload.scoring, payload.results, payload.agent_status,
-          ]
-        );
-        inserted += 1;
+      // Ensure processed_data exists
+      const pd = await runQuery(`select to_regclass('public.processed_data') is not null as exists`);
+      const hasPd = Boolean(pd.rows?.[0]?.exists);
+      if (!hasPd) {
+        return NextResponse.json({ error: "processed_data missing" }, { status: 400 });
       }
 
-      return NextResponse.json({ ok: true, inserted });
+      // Populate scoring_data directly from processed_data (columns align)
+      const ins = await runQuery(`
+        insert into public.scoring_data (
+          qa_name, agent_caller_name,
+          opening_response_time, ongoing_response_time, holding_management, closing_management,
+          verification_efficiency, thoroughness, proactiveness, relevance_and_clarity, language_natural_flow,
+          correction, proper_empathy_acknowledgement,
+          breach_confidentiality, rudeness_unprofessionalism,
+          overall_chat_handling_customer_experience,
+          scoring, results, agent_status
+        )
+        select
+          coalesce(pd.qa_name, 'AIVA') as qa_name,
+          pd.agent_caller_name,
+          pd.opening_response_time, pd.ongoing_response_time, pd.holding_management, pd.closing_management,
+          pd.verification_efficiency, pd.thoroughness, pd.proactiveness, pd.relevance_and_clarity, pd.language_natural_flow,
+          pd.correction, pd.proper_empathy_acknowledgement,
+          pd.breach_confidentiality, pd.rudeness_unprofessionalism,
+          pd.overall_chat_handling_customer_experience,
+          pd.scoring, pd.results, pd.agent_status
+        from public.processed_data pd
+      `);
+
+      return NextResponse.json({ ok: true, inserted: ins.rowCount ?? null });
     }
 
     return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
