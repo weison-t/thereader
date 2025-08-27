@@ -49,14 +49,14 @@ export async function POST(req: NextRequest) {
     const normalPercent = Math.max(0, Math.min(100, Number(body.normalPercent ?? 100)));
     const vipPercent = Math.max(0, Math.min(100, Number(body.vipPercent ?? 100)));
 
-    // Ensure processed_data exists
-    const pdQ = await client.query("select to_regclass('public.processed_data') is not null as exists");
-    const pdExists = Boolean(pdQ.rows?.[0]?.exists);
-    if (!pdExists) return Response.json({ error: "processed_data missing" }, { status: 400 });
+    // Ensure data_snapshot exists (Sampling Selection is based on Data Snapshot)
+    const dsQ = await client.query("select to_regclass('public.data_snapshot') is not null as exists");
+    const dsExists = Boolean(dsQ.rows?.[0]?.exists);
+    if (!dsExists) return Response.json({ error: "data_snapshot missing" }, { status: 400 });
 
     // Build agents sample temp table
     await client.query("drop table if exists tmp_agents");
-    await client.query("create temporary table tmp_agents as select distinct coalesce(actual_agent, agent) as agent_key from public.processed_data");
+    await client.query("create temporary table tmp_agents as select distinct coalesce(actual_agent, agent) as agent_key from public.data_snapshot");
     const agentsCountQ = await client.query("select count(*)::int as c from tmp_agents");
     const totalAgents = Number(agentsCountQ.rows?.[0]?.c ?? 0);
     const takeAgents = agentMode === "all" ? totalAgents : Math.ceil((agentPercent / 100) * totalAgents);
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     // Filter processed_data by selected agents
     await client.query("drop table if exists tmp_pd_filtered");
     await client.query(
-      "create temporary table tmp_pd_filtered as select * from public.processed_data pd where coalesce(pd.actual_agent, pd.agent) in (select agent_key from tmp_agents_pick)"
+      "create temporary table tmp_pd_filtered as select * from public.data_snapshot pd where coalesce(pd.actual_agent, pd.agent) in (select agent_key from tmp_agents_pick)"
     );
 
     // Within filtered rows, sample normal and vip portions separately based on vip_status
