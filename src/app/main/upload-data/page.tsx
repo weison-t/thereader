@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createSupabaseBrowser } from "@/lib/supabase-browser";
 import UploadSection from "@/components/UploadSection";
 
 export default function UploadDataPage() {
@@ -44,13 +45,12 @@ export default function UploadDataPage() {
       const presData = await pres.json();
       if (!pres.ok) throw new Error(presData?.error || "Presign failed");
 
-      // Step 2: upload directly to Supabase Storage
-      const uploadRes = await fetch(presData.token, {
-        method: "PUT",
-        headers: { "Content-Type": file.type || "text/csv" },
-        body: file,
-      });
-      if (!uploadRes.ok) throw new Error("Storage upload failed");
+      // Step 2: upload directly to Supabase Storage via signed URL token
+      const supa = createSupabaseBrowser();
+      const { error: upErr } = await supa.storage
+        .from(presData.bucket)
+        .uploadToSignedUrl(presData.path, presData.token, file, { contentType: file.type || "text/csv", upsert: true });
+      if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
 
       // Step 3: tell server to process the stored object
       const res = await fetch("/api/upload", {
