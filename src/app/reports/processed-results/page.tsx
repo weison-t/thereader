@@ -11,7 +11,7 @@ export default function ReportsProcessedResultsPage() {
   const load = async () => {
     try {
       setStatus("Loading...");
-      const res = await fetch("/api/processed-data", { cache: "no-store" });
+      const res = await fetch("/api/scoring-data", { cache: "no-store" });
       const j = await res.json();
       if (!res.ok || j?.error) throw new Error(j?.error || "Failed to load processed data");
       setRowsCount(Number(j?.total ?? (j?.rows || []).length || 0));
@@ -31,7 +31,7 @@ export default function ReportsProcessedResultsPage() {
   const handleProcess = async () => {
     setStatus("Processing...");
     try {
-      const res = await fetch("/api/processed-data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "process", replace: true }) });
+      const res = await fetch("/api/scoring-data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "process", replace: true }) });
       const d = await res.json();
       if (!res.ok || d?.error) throw new Error(d?.error || "Failed to process");
       await load();
@@ -51,7 +51,7 @@ export default function ReportsProcessedResultsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "processed_data.csv";
+    a.download = "scoring_data.csv";
     a.click();
     URL.revokeObjectURL(url);
   };
